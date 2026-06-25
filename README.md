@@ -10,8 +10,9 @@ compute their own embeddings and send the vectors in.
 ## Quick start
 
 ```bash
-docker compose up --build   # FastAPI on :8000, Redis on :6379
-pytest                      # run the test suite (no Redis required)
+docker compose up --build   # FastAPI on :8000 (Redis backend), Redis on :6379
+pytest -m "not integration" # fast unit suite (no Redis required)
+docker compose run --rm api pytest -m integration   # Redis contract tests
 ```
 
 Interactive API docs at <http://localhost:8000/docs>.
@@ -37,5 +38,8 @@ Interactive API docs at <http://localhost:8000/docs>.
 
 ## Status
 
-- Core service, API, and the in-process `VectorStore` (used for tests and local dev) are implemented.
-- **Pending:** the Redis-stack-backed `VectorStore` and TTL/eviction enforcement.
+- Core service, API, and both `VectorStore` backends are implemented and tested:
+  the in-process store (default; used for fast unit tests and local dev) and the
+  Redis-stack store (`SEMCACHE_BACKEND=redis`, used by the container) with TTL expiry.
+- Backend is selected by `SEMCACHE_BACKEND` (`memory` | `redis`); both behave
+  identically behind the `VectorStore` protocol.

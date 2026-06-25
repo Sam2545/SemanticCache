@@ -24,6 +24,9 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: requires a live redis-stack (run with -m integration; skip with -m 'not integration')",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

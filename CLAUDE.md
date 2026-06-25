@@ -64,8 +64,9 @@ keys, so semantically equivalent requests can reuse a prior response.
 ## Development Commands
 
 ```bash
-docker compose up --build   # build and run the service (and dependencies, e.g. Redis)
-pytest                      # run the test suite
+docker compose up --build                            # build and run the service (Redis backend) + Redis
+pytest -m "not integration"                          # fast unit suite (no Redis required)
+docker compose run --rm api pytest -m integration    # Redis contract tests (needs redis-stack)
 ```
 
 ## Architecture
@@ -85,6 +86,6 @@ mapped to HTTP status codes by exception handlers in `app/main.py` (404 / 409 / 
 
 ### Current state
 
-- `InMemoryVectorStore` is the default backend (deterministic, no external deps) and the test/dev double.
-- **Not yet built:** the Redis-stack `VectorStore` implementation and TTL/eviction enforcement. Wire Redis in at `app.dependencies.get_service` — routes and the service need no changes.
-- Run a single test: `pytest tests/test_cache_service.py::test_threshold_boundary_is_inclusive`.
+- Two `VectorStore` backends, selected by `SEMCACHE_BACKEND`: `InMemoryVectorStore` (default; deterministic, the unit-test/dev double) and `RedisVectorStore` (redis-stack, used by the container). Both verified to behave identically behind the protocol.
+- `RedisVectorStore` converts RediSearch cosine *distance* to *similarity* (`1 - distance`) so scores match the in-memory store. TTL is enforced via Redis key expiry.
+- Redis tests are marked `integration` (in `tests/integration/`) and need a live redis-stack; run them in the container with the command above. Single unit test, e.g.: `pytest tests/test_cache_service.py::test_threshold_boundary_is_inclusive`.

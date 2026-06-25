@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SEMCACHE_")
 
+    backend: str = "memory"  # "memory" | "redis"
     redis_url: str = "redis://localhost:6379"
     default_threshold: float = 0.8
     default_top_k: int = 5

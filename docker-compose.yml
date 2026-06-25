@@ -4,6 +4,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      SEMCACHE_BACKEND: redis
       SEMCACHE_REDIS_URL: redis://redis:6379
     depends_on:
       - redis
