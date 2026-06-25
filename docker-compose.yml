@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SEMCACHE_REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+
+  redis:
+    image: redis/redis-stack-server:latest
+    ports:
+      - "6379:6379"
