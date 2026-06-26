@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Sequence
 
 import numpy as np
@@ -15,6 +16,13 @@ except ImportError:  # pragma: no cover - older redis-py
     from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 
 from app.vectorstore.base import Namespace, ScoredEntry, StoredEntry
+
+_TAG_SPECIAL = re.compile(r"([,.<>{}\[\]\"':;!@#$%^&*()\-+=~|/\\ ])")
+
+
+def _escape_tag(value: str) -> str:
+    """Escape RediSearch TAG special characters for exact-match queries."""
+    return _TAG_SPECIAL.sub(r"\\\1", value)
 
 
 def _decode(v: Any) -> Any:
@@ -63,6 +71,7 @@ class RedisVectorStore:
                 "default_threshold": namespace.default_threshold,
                 "default_top_k": namespace.default_top_k,
                 "ttl": "" if namespace.ttl is None else namespace.ttl,
+                "filter_keys": json.dumps(namespace.filter_keys),
             },
         )
         self._ensure_index(namespace)
@@ -79,29 +88,44 @@ class RedisVectorStore:
             default_threshold=float(d["default_threshold"]),
             default_top_k=int(d["default_top_k"]),
             ttl=int(d["ttl"]) if d["ttl"] != "" else None,
+            filter_keys=json.loads(d["filter_keys"]) if "filter_keys" in d else [],
         )
 
     def upsert(self, namespace: str, entry: StoredEntry) -> None:
-        doc_key = self._doc_key(namespace, entry.key)
-        self._client.hset(
-            doc_key,
-            mapping={
-                "key": entry.key,
-                "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
-                "value": json.dumps(entry.value),
-                "metadata": json.dumps(entry.metadata),
-            },
-        )
         ns = self.get_namespace(namespace)
+        doc_key = self._doc_key(namespace, entry.key)
+        mapping: dict[str, object] = {
+            "key": entry.key,
+            "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
+            "value": json.dumps(entry.value),
+            "metadata": json.dumps(entry.metadata),
+        }
+        if ns:
+            for k in ns.filter_keys:
+                if k in entry.metadata:
+                    mapping[f"flt_{k}"] = str(entry.metadata[k])
+        self._client.hset(doc_key, mapping=mapping)
         if ns and ns.ttl:
             self._client.expire(doc_key, ns.ttl)
 
     def search(
-        self, namespace: str, embedding: Sequence[float], top_k: int
+        self,
+        namespace: str,
+        embedding: Sequence[float],
+        top_k: int,
+        filter: dict[str, object] | None = None,
     ) -> list[ScoredEntry]:
+        flt = filter or {}
         blob = np.asarray(embedding, dtype=np.float32).tobytes()
+        if flt:
+            clause = " ".join(
+                f"@flt_{k}:{{{_escape_tag(str(v))}}}" for k, v in flt.items()
+            )
+            prefix = f"({clause})"
+        else:
+            prefix = "*"
         query = (
-            Query(f"*=>[KNN {top_k} @embedding $vec AS distance]")
+            Query(f"{prefix}=>[KNN {top_k} @embedding $vec AS distance]")
             .sort_by("distance")
             .return_fields("key", "value", "metadata", "distance")
             .dialect(2)
@@ -147,6 +171,7 @@ class RedisVectorStore:
             TagField("key"),
             TextField("value"),
             TextField("metadata"),
+            *(TagField(f"flt_{k}") for k in namespace.filter_keys),
             VectorField(
                 "embedding",
                 "FLAT",

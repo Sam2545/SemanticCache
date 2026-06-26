@@ -115,3 +115,30 @@ def test_ttl_expires_entries(redis_store):
     assert redis_store.get("ns", "a") is not None
     time.sleep(1.5)
     assert redis_store.get("ns", "a") is None
+
+
+def test_namespace_round_trips_filter_keys(redis_store):
+    redis_store.create_namespace(
+        Namespace(name="ns", dimension=2, filter_keys=["model", "embed_model"])
+    )
+    assert redis_store.get_namespace("ns").filter_keys == ["model", "embed_model"]
+
+
+def test_search_filters_by_metadata(redis_store):
+    redis_store.create_namespace(Namespace(name="ns", dimension=2, filter_keys=["model"]))
+    redis_store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "gpt-oss:120b"}))
+    redis_store.upsert("ns", StoredEntry(key="b", embedding=[1.0, 0.0], value="B", metadata={"model": "minimax-m3"}))
+    results = redis_store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "gpt-oss:120b"})
+    assert [r.key for r in results] == ["a"]
+
+
+def test_filter_prefilters_before_knn(redis_store):
+    # The wanted-model entry is ranked BELOW several other-model entries; a
+    # pre-filter must still surface it (a post-filter would drop it).
+    redis_store.create_namespace(Namespace(name="ns", dimension=2, filter_keys=["model"]))
+    redis_store.upsert("ns", StoredEntry(key="b1", embedding=[1.0, 0.00], value=1, metadata={"model": "B"}))
+    redis_store.upsert("ns", StoredEntry(key="b2", embedding=[1.0, 0.01], value=2, metadata={"model": "B"}))
+    redis_store.upsert("ns", StoredEntry(key="b3", embedding=[1.0, 0.02], value=3, metadata={"model": "B"}))
+    redis_store.upsert("ns", StoredEntry(key="a1", embedding=[0.8, 0.6], value=4, metadata={"model": "A"}))
+    results = redis_store.search("ns", [1.0, 0.0], top_k=1, filter={"model": "A"})
+    assert [r.key for r in results] == ["a1"]
