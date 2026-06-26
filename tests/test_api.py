@@ -98,3 +98,24 @@ def test_delete_entry(client):
     client.post("/ns/entries", json={"key": "a", "embedding": [1.0, 0.0], "value": "A"})
     assert client.delete("/ns/entries/a").status_code == 204
     assert client.get("/ns/entries/a").status_code == 404
+
+
+def test_create_namespace_with_filter_keys(client):
+    r = client.post("/namespaces", json={"name": "ns", "dimension": 2, "filter_keys": ["model"]})
+    assert r.status_code == 201
+    assert r.json()["filter_keys"] == ["model"]
+
+
+def test_query_with_filter_scopes_to_model(client):
+    client.post("/namespaces", json={"name": "ns", "dimension": 2, "default_threshold": 0.0, "filter_keys": ["model"]})
+    client.post("/ns/entries", json={"key": "a", "embedding": [1.0, 0.0], "value": "A", "metadata": {"model": "x"}})
+    client.post("/ns/entries", json={"key": "b", "embedding": [1.0, 0.0], "value": "B", "metadata": {"model": "y"}})
+    r = client.post("/ns/query", json={"embedding": [1.0, 0.0], "filter": {"model": "x"}})
+    assert r.status_code == 200
+    assert [m["key"] for m in r.json()["matches"]] == ["a"]
+
+
+def test_query_undeclared_filter_key_unprocessable(client):
+    client.post("/namespaces", json={"name": "ns", "dimension": 2, "filter_keys": ["model"]})
+    r = client.post("/ns/query", json={"embedding": [1.0, 0.0], "filter": {"temperature": "0"}})
+    assert r.status_code == 422

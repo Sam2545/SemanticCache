@@ -11,6 +11,7 @@ class CreateNamespaceRequest(BaseModel):
     default_threshold: float | None = None
     default_top_k: int | None = Field(default=None, gt=0)
     ttl: int | None = Field(default=None, gt=0)
+    filter_keys: list[str] = Field(default_factory=list)
 
 
 class NamespaceResponse(BaseModel):
@@ -20,6 +21,7 @@ class NamespaceResponse(BaseModel):
     default_threshold: float
     default_top_k: int
     ttl: int | None = None
+    filter_keys: list[str] = Field(default_factory=list)
 
 
 class WriteEntryRequest(BaseModel):
@@ -39,6 +41,7 @@ class QueryRequest(BaseModel):
     embedding: list[float]
     threshold: float | None = None
     top_k: int | None = Field(default=None, gt=0)
+    filter: dict[str, str | int | float | bool] | None = None
 
 
 class Match(BaseModel):

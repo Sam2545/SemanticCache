@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.routes.cache import router
 from app.services.cache import (
     DimensionMismatch,
+    InvalidFilter,
     NamespaceExists,
     NamespaceNotFound,
 )
@@ -26,6 +27,11 @@ def _namespace_exists(request: Request, exc: NamespaceExists) -> JSONResponse:
 
 @app.exception_handler(DimensionMismatch)
 def _dimension_mismatch(request: Request, exc: DimensionMismatch) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+
+@app.exception_handler(InvalidFilter)
+def _invalid_filter(request: Request, exc: InvalidFilter) -> JSONResponse:
     return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 

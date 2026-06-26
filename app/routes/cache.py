@@ -31,6 +31,7 @@ def create_namespace(
         default_threshold=body.default_threshold,
         default_top_k=body.default_top_k,
         ttl=body.ttl,
+        filter_keys=body.filter_keys,
     )
     return NamespaceResponse(
         name=ns.name,
@@ -39,6 +40,7 @@ def create_namespace(
         default_threshold=ns.default_threshold,
         default_top_k=ns.default_top_k,
         ttl=ns.ttl,
+        filter_keys=ns.filter_keys,
     )
 
 
@@ -73,6 +75,7 @@ def query(
         embedding=body.embedding,
         threshold=body.threshold,
         top_k=body.top_k,
+        filter=body.filter,
     )
     return QueryResponse(
         matches=[
