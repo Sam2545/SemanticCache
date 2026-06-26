@@ -39,6 +39,7 @@ Interactive API docs at <http://localhost:8000/docs>.
 | `POST` | `/{namespace}/query` | Similarity lookup by `embedding` |
 | `GET`  | `/{namespace}/entries/{key}` | Fetch an entry exactly by `key` |
 | `DELETE` | `/{namespace}/entries/{key}` | Invalidate an entry by `key` |
+| `GET`  | `/{namespace}/stats` | Cache-effectiveness metrics for the namespace |
 
 ## Status
 

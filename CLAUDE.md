@@ -39,6 +39,11 @@ keys, so semantically equivalent requests can reuse a prior response.
   (conjunctive exact-match on those keys) to scope matches — e.g. keep responses
   from different generation models separate. Undeclared filter key → 422.
   Filtering is a pre-filter inside the `VectorStore` (correct `top_k`).
+- The query response includes `hit` (bool) and the effective `threshold`.
+  `GET /{namespace}/stats` reports entries, hits/misses, `hit_rate`,
+  `avg_similarity`, measured `avg_lookup_latency_ms`/`avg_store_search_ms`, and
+  estimated latency/cost/tokens saved. Metrics are Redis-backed via a
+  `MetricsStore` (in-memory for dev/tests), selected by `SEMCACHE_BACKEND`.
 
 ### Vector store
 

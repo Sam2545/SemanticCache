@@ -239,6 +239,19 @@ PAIRS = [
 ]
 
 
+def print_stats() -> None:
+    resp = _semcache("GET", f"/{NAMESPACE}/stats")
+    if resp.status_code != 200:
+        return
+    s = resp.json()
+    print(
+        f"\nstats for '{NAMESPACE}': "
+        f"{s['hits']}/{s['queries']} hits ({s['hit_rate']:.0%}), "
+        f"avg similarity {s['avg_similarity']:.3f}, "
+        f"~{s['estimated_latency_saved_ms']:.0f} ms saved"
+    )
+
+
 def main() -> int:
     print(f"chat:       {CHAT_MODEL} @ {CHAT_BASE_URL}")
     print(f"embeddings: {EMBED_MODEL} @ {EMBED_BASE_URL}")
@@ -253,6 +266,7 @@ def main() -> int:
             print(f"\nQ (paraphrase): {paraphrase}")
             print(textwrap.indent(ask(paraphrase), "   "))
             print("-" * 70)
+        print_stats()
     except DemoError as exc:
         print(f"\nError: {exc}", file=sys.stderr)
         return 1
