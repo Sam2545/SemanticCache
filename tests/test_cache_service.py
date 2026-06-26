@@ -3,6 +3,7 @@ import pytest
 from app.services.cache import (
     CacheService,
     DimensionMismatch,
+    InvalidFilter,
     NamespaceExists,
     NamespaceNotFound,
 )
@@ -87,3 +88,30 @@ def test_get_and_delete(svc_ns):
     assert svc_ns.get("ns", "a").value == "A"
     assert svc_ns.delete("ns", "a") is True
     assert svc_ns.get("ns", "a") is None
+
+
+def test_create_namespace_stores_filter_keys(service):
+    ns = service.create_namespace("ns", dimension=2, filter_keys=["model"])
+    assert ns.filter_keys == ["model"]
+    assert service.get_namespace("ns").filter_keys == ["model"]
+
+
+def test_query_filter_returns_only_matching_model(service):
+    service.create_namespace("ns", dimension=2, filter_keys=["model"])
+    service.put("ns", key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "x"})
+    service.put("ns", key="b", embedding=[1.0, 0.0], value="B", metadata={"model": "y"})
+    matches = service.query("ns", embedding=[1.0, 0.0], threshold=0.0, filter={"model": "x"})
+    assert [m.key for m in matches] == ["a"]
+
+
+def test_query_without_filter_returns_all_models(service):
+    service.create_namespace("ns", dimension=2, filter_keys=["model"])
+    service.put("ns", key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "x"})
+    service.put("ns", key="b", embedding=[1.0, 0.0], value="B", metadata={"model": "y"})
+    assert len(service.query("ns", embedding=[1.0, 0.0], threshold=0.0)) == 2
+
+
+def test_query_undeclared_filter_key_raises(service):
+    service.create_namespace("ns", dimension=2, filter_keys=["model"])
+    with pytest.raises(InvalidFilter):
+        service.query("ns", embedding=[1.0, 0.0], filter={"temperature": "0"})

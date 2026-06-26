@@ -21,6 +21,10 @@ class DimensionMismatch(CacheError):
     pass
 
 
+class InvalidFilter(CacheError):
+    pass
+
+
 class CacheService:
     """Business logic for the semantic cache.
 
@@ -38,6 +42,7 @@ class CacheService:
         default_threshold: float | None = None,
         default_top_k: int | None = None,
         ttl: int | None = None,
+        filter_keys: list[str] | None = None,
     ) -> Namespace:
         if self._store.get_namespace(name) is not None:
             raise NamespaceExists(name)
@@ -47,6 +52,8 @@ class CacheService:
         if default_top_k is not None:
             ns.default_top_k = default_top_k
         ns.ttl = ttl
+        if filter_keys is not None:
+            ns.filter_keys = filter_keys
         self._store.create_namespace(ns)
         return ns
 
@@ -78,11 +85,19 @@ class CacheService:
         embedding: Sequence[float],
         threshold: float | None = None,
         top_k: int | None = None,
+        filter: dict[str, object] | None = None,
     ) -> list[ScoredEntry]:
         ns = self._require_dimension(namespace, embedding)
+        flt = filter or {}
+        unknown = set(flt) - set(ns.filter_keys)
+        if unknown:
+            raise InvalidFilter(
+                f"filter keys {sorted(unknown)} not declared for namespace "
+                f"'{namespace}' (declared: {ns.filter_keys})"
+            )
         threshold = ns.default_threshold if threshold is None else threshold
         top_k = ns.default_top_k if top_k is None else top_k
-        candidates = self._store.search(namespace, embedding, top_k)
+        candidates = self._store.search(namespace, embedding, top_k, flt)
         return [c for c in candidates if c.score >= threshold]
 
     def get(self, namespace: str, key: str) -> StoredEntry | None:
