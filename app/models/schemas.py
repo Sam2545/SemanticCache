@@ -53,7 +53,19 @@ class Match(BaseModel):
 
 class QueryResponse(BaseModel):
     matches: list[Match]
+    hit: bool
+    threshold: float
 
-    @property
-    def hit(self) -> bool:
-        return len(self.matches) > 0
+
+class StatsResponse(BaseModel):
+    entries: int
+    queries: int
+    hits: int
+    misses: int
+    hit_rate: float
+    avg_similarity: float
+    avg_lookup_latency_ms: float
+    avg_store_search_ms: float
+    estimated_latency_saved_ms: float
+    estimated_cost_saved_usd: float
+    estimated_tokens_saved: int

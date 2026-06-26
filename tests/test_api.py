@@ -119,3 +119,35 @@ def test_query_undeclared_filter_key_unprocessable(client):
     client.post("/namespaces", json={"name": "ns", "dimension": 2, "filter_keys": ["model"]})
     r = client.post("/ns/query", json={"embedding": [1.0, 0.0], "filter": {"temperature": "0"}})
     assert r.status_code == 422
+
+
+def test_query_response_includes_hit_and_threshold(client):
+    client.post("/namespaces", json={"name": "ns", "dimension": 2, "default_threshold": 0.5})
+    client.post("/ns/entries", json={"key": "a", "embedding": [1.0, 0.0], "value": "A"})
+    hit = client.post("/ns/query", json={"embedding": [1.0, 0.0]}).json()
+    assert hit["hit"] is True
+    assert hit["threshold"] == 0.5
+    miss = client.post("/ns/query", json={"embedding": [0.0, 1.0], "threshold": 0.99}).json()
+    assert miss["hit"] is False
+    assert miss["threshold"] == 0.99
+
+
+def test_stats_endpoint_reports_hits_and_misses(client):
+    client.post("/namespaces", json={"name": "ns", "dimension": 2, "default_threshold": 0.5})
+    client.post("/ns/entries", json={"key": "a", "embedding": [1.0, 0.0], "value": "A"})
+    client.post("/ns/query", json={"embedding": [1.0, 0.0]})
+    client.post("/ns/query", json={"embedding": [0.0, 1.0]})
+    r = client.get("/ns/stats")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["entries"] == 1
+    assert body["queries"] == 2
+    assert body["hits"] == 1
+    assert body["misses"] == 1
+    assert body["hit_rate"] == 0.5
+    assert body["estimated_latency_saved_ms"] == 800.0
+    assert "avg_lookup_latency_ms" in body and "avg_store_search_ms" in body
+
+
+def test_stats_missing_namespace_not_found(client):
+    assert client.get("/nope/stats").status_code == 404

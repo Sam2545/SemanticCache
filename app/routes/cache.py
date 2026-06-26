@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import asdict
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.dependencies import get_service
@@ -10,6 +12,7 @@ from app.models.schemas import (
     NamespaceResponse,
     QueryRequest,
     QueryResponse,
+    StatsResponse,
     WriteEntryRequest,
 )
 from app.services.cache import CacheService
@@ -81,8 +84,17 @@ def query(
         matches=[
             Match(key=m.key, score=m.score, value=m.value, metadata=m.metadata)
             for m in matches
-        ]
+        ],
+        hit=len(matches) > 0,
+        threshold=service.effective_threshold(namespace, body.threshold),
     )
+
+
+@router.get("/{namespace}/stats", response_model=StatsResponse)
+def get_stats(
+    namespace: str, service: CacheService = Depends(get_service)
+) -> StatsResponse:
+    return StatsResponse(**asdict(service.stats(namespace)))
 
 
 @router.get("/{namespace}/entries/{key}", response_model=EntryResponse)
