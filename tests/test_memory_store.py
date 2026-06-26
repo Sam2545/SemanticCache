@@ -68,3 +68,15 @@ def test_delete_removes_entry(store):
     assert store.delete("ns", "a") is True
     assert store.get("ns", "a") is None
     assert store.delete("ns", "a") is False
+
+
+def test_namespace_round_trips_filter_keys():
+    s = InMemoryVectorStore()
+    s.create_namespace(Namespace(name="ns", dimension=2, filter_keys=["model"]))
+    assert s.get_namespace("ns").filter_keys == ["model"]
+
+
+def test_namespace_filter_keys_defaults_empty():
+    s = InMemoryVectorStore()
+    s.create_namespace(Namespace(name="ns", dimension=2))
+    assert s.get_namespace("ns").filter_keys == []

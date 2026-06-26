@@ -14,6 +14,7 @@ class Namespace:
     default_threshold: float = 0.8
     default_top_k: int = 5
     ttl: int | None = None
+    filter_keys: list[str] = field(default_factory=list)
 
 
 @dataclass
