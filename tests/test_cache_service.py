@@ -115,3 +115,41 @@ def test_query_undeclared_filter_key_raises(service):
     service.create_namespace("ns", dimension=2, filter_keys=["model"])
     with pytest.raises(InvalidFilter):
         service.query("ns", embedding=[1.0, 0.0], filter={"temperature": "0"})
+
+
+def test_query_records_hit_in_stats(service):
+    service.create_namespace("ns", dimension=2)
+    service.put("ns", key="a", embedding=[1.0, 0.0], value="A")
+    service.query("ns", embedding=[1.0, 0.0], threshold=0.0)
+    s = service.stats("ns")
+    assert s.hits == 1 and s.misses == 0 and s.queries == 1
+    assert s.entries == 1
+    assert s.avg_lookup_latency_ms >= 0.0
+
+
+def test_query_records_miss_in_stats(service):
+    service.create_namespace("ns", dimension=2)
+    service.put("ns", key="a", embedding=[1.0, 0.0], value="A")
+    service.query("ns", embedding=[0.0, 1.0], threshold=0.99)
+    s = service.stats("ns")
+    assert s.misses == 1 and s.hits == 0
+
+
+def test_effective_threshold_default_and_override(service):
+    service.create_namespace("ns", dimension=2, default_threshold=0.7)
+    assert service.effective_threshold("ns", None) == 0.7
+    assert service.effective_threshold("ns", 0.9) == 0.9
+
+
+def test_stats_estimates_savings_with_default_assumptions(service):
+    service.create_namespace("ns", dimension=2)
+    service.put("ns", key="a", embedding=[1.0, 0.0], value="A")
+    service.query("ns", embedding=[1.0, 0.0], threshold=0.0)
+    s = service.stats("ns")
+    assert s.estimated_latency_saved_ms == 800.0
+    assert s.estimated_tokens_saved == 500
+
+
+def test_stats_missing_namespace_raises(service):
+    with pytest.raises(NamespaceNotFound):
+        service.stats("nope")
