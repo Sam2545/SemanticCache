@@ -158,6 +158,10 @@ class RedisVectorStore:
     def delete(self, namespace: str, key: str) -> bool:
         return self._client.delete(self._doc_key(namespace, key)) > 0
 
+    def count(self, namespace: str) -> int:
+        info = self._client.ft(self._index(namespace)).info()
+        return int(info["num_docs"])
+
     # --- internals -------------------------------------------------------
 
     def _ensure_index(self, namespace: Namespace) -> None:

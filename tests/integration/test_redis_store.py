@@ -152,3 +152,13 @@ def test_filter_is_case_sensitive(redis_store):
     # Exact-case filter matches.
     results = redis_store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "GPT-4"})
     assert [r.key for r in results] == ["a"]
+
+
+def test_count_reflects_entries(redis_store):
+    redis_store.create_namespace(Namespace(name="ns", dimension=2))
+    assert redis_store.count("ns") == 0
+    redis_store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A"))
+    redis_store.upsert("ns", StoredEntry(key="b", embedding=[0.0, 1.0], value="B"))
+    assert redis_store.count("ns") == 2
+    redis_store.delete("ns", "a")
+    assert redis_store.count("ns") == 1
