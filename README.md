@@ -25,6 +25,10 @@ Interactive API docs at <http://localhost:8000/docs>.
   get / delete); `embedding` is the similarity axis that queries search.
 - **Query** — send an `embedding`; get back up to `top_k` entries scoring `>= threshold`
   (cosine, descending). A non-empty result is a cache **hit**.
+- **Filter keys** — a namespace can declare `filter_keys` (e.g. `["model"]`).
+  Queries pass a matching `filter` so responses from different models are cached
+  and served separately. Different *embedding* models belong in separate
+  namespaces (their vectors aren't comparable).
 
 ## API
 

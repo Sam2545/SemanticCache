@@ -168,6 +168,7 @@ def ensure_namespace(dimension: int) -> None:
             "name": NAMESPACE,
             "dimension": dimension,
             "default_threshold": THRESHOLD,
+            "filter_keys": ["model"],
         },
     )
     if resp.status_code == 201:
@@ -184,7 +185,11 @@ def ensure_namespace(dimension: int) -> None:
 
 
 def query_cache(embedding: list[float]) -> list[dict]:
-    resp = _semcache("POST", f"/{NAMESPACE}/query", json={"embedding": embedding})
+    resp = _semcache(
+        "POST",
+        f"/{NAMESPACE}/query",
+        json={"embedding": embedding, "filter": {"model": CHAT_MODEL}},
+    )
     if resp.status_code != 200:
         raise DemoError(f"query failed ({resp.status_code}): {resp.text}")
     return resp.json()["matches"]
@@ -194,7 +199,12 @@ def store(key: str, embedding: list[float], answer: str) -> None:
     resp = _semcache(
         "POST",
         f"/{NAMESPACE}/entries",
-        json={"key": key, "embedding": embedding, "value": answer},
+        json={
+            "key": key,
+            "embedding": embedding,
+            "value": answer,
+            "metadata": {"model": CHAT_MODEL},
+        },
     )
     if resp.status_code != 201:
         raise DemoError(f"store failed ({resp.status_code}): {resp.text}")

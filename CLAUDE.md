@@ -35,6 +35,10 @@ keys, so semantically equivalent requests can reuse a prior response.
 - **Write** keys off `key` (idempotent upsert). **Query** keys off `embedding` and returns up to
   `top_k` entries scoring `>= threshold`, ordered descending. A **hit** = at least one such entry.
 - GET/DELETE by `key` are exact, non-similarity operations for inspection and targeted invalidation.
+- A namespace may declare immutable `filter_keys`. A query may pass a `filter`
+  (conjunctive exact-match on those keys) to scope matches — e.g. keep responses
+  from different generation models separate. Undeclared filter key → 422.
+  Filtering is a pre-filter inside the `VectorStore` (correct `top_k`).
 
 ### Vector store
 
