@@ -142,3 +142,13 @@ def test_filter_prefilters_before_knn(redis_store):
     redis_store.upsert("ns", StoredEntry(key="a1", embedding=[0.8, 0.6], value=4, metadata={"model": "A"}))
     results = redis_store.search("ns", [1.0, 0.0], top_k=1, filter={"model": "A"})
     assert [r.key for r in results] == ["a1"]
+
+
+def test_filter_is_case_sensitive(redis_store):
+    redis_store.create_namespace(Namespace(name="ns", dimension=2, filter_keys=["model"]))
+    redis_store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "GPT-4"}))
+    # A lowercase filter must NOT match an upper-case stored value (parity with in-memory).
+    assert redis_store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "gpt-4"}) == []
+    # Exact-case filter matches.
+    results = redis_store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "GPT-4"})
+    assert [r.key for r in results] == ["a"]

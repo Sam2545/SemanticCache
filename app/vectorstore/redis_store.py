@@ -171,7 +171,7 @@ class RedisVectorStore:
             TagField("key"),
             TextField("value"),
             TextField("metadata"),
-            *(TagField(f"flt_{k}") for k in namespace.filter_keys),
+            *(TagField(f"flt_{k}", case_sensitive=True) for k in namespace.filter_keys),
             VectorField(
                 "embedding",
                 "FLAT",
