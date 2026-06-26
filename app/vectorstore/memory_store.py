@@ -27,8 +27,13 @@ class InMemoryVectorStore:
         self._entries[namespace][entry.key] = entry
 
     def search(
-        self, namespace: str, embedding: Sequence[float], top_k: int
+        self,
+        namespace: str,
+        embedding: Sequence[float],
+        top_k: int,
+        filter: dict[str, object] | None = None,
     ) -> list[ScoredEntry]:
+        flt = filter or {}
         scored = [
             ScoredEntry(
                 key=e.key,
@@ -37,6 +42,7 @@ class InMemoryVectorStore:
                 metadata=e.metadata,
             )
             for e in self._entries[namespace].values()
+            if all(k in e.metadata and str(e.metadata[k]) == str(v) for k, v in flt.items())
         ]
         scored.sort(key=lambda s: s.score, reverse=True)
         return scored[:top_k]

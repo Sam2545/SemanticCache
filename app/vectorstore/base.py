@@ -52,7 +52,11 @@ class VectorStore(Protocol):
     def upsert(self, namespace: str, entry: StoredEntry) -> None: ...
 
     def search(
-        self, namespace: str, embedding: Sequence[float], top_k: int
+        self,
+        namespace: str,
+        embedding: Sequence[float],
+        top_k: int,
+        filter: dict[str, object] | None = None,
     ) -> list[ScoredEntry]: ...
 
     def get(self, namespace: str, key: str) -> StoredEntry | None: ...

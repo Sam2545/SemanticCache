@@ -80,3 +80,28 @@ def test_namespace_filter_keys_defaults_empty():
     s = InMemoryVectorStore()
     s.create_namespace(Namespace(name="ns", dimension=2))
     assert s.get_namespace("ns").filter_keys == []
+
+
+def test_search_filters_by_metadata(store):
+    store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "x"}))
+    store.upsert("ns", StoredEntry(key="b", embedding=[1.0, 0.0], value="B", metadata={"model": "y"}))
+    results = store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "x"})
+    assert [r.key for r in results] == ["a"]
+
+
+def test_search_without_filter_returns_all(store):
+    store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "x"}))
+    store.upsert("ns", StoredEntry(key="b", embedding=[1.0, 0.0], value="B", metadata={"model": "y"}))
+    assert len(store.search("ns", [1.0, 0.0], top_k=10)) == 2
+
+
+def test_search_filter_is_conjunctive(store):
+    store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={"model": "x", "lang": "en"}))
+    store.upsert("ns", StoredEntry(key="b", embedding=[1.0, 0.0], value="B", metadata={"model": "x", "lang": "fr"}))
+    results = store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "x", "lang": "en"})
+    assert [r.key for r in results] == ["a"]
+
+
+def test_search_filter_excludes_entry_missing_key(store):
+    store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={}))
+    assert store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "x"}) == []
