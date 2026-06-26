@@ -17,6 +17,7 @@ keys, so semantically equivalent requests can reuse a prior response.
 - Keep FastAPI routes thin: parse/validate request, call a service, return response.
 - Put business logic in service modules.
 - Put Redis / vector-search logic in `vectorstore/` or `cache/` modules.
+- Commit messages: a single line under 150 characters, with no `Co-Authored-By` trailer.
 
 ### Embeddings
 
