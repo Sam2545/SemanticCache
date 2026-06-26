@@ -52,3 +52,6 @@ class InMemoryVectorStore:
 
     def delete(self, namespace: str, key: str) -> bool:
         return self._entries[namespace].pop(key, None) is not None
+
+    def count(self, namespace: str) -> int:
+        return len(self._entries[namespace])

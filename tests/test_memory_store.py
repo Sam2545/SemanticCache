@@ -105,3 +105,12 @@ def test_search_filter_is_conjunctive(store):
 def test_search_filter_excludes_entry_missing_key(store):
     store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A", metadata={}))
     assert store.search("ns", [1.0, 0.0], top_k=10, filter={"model": "x"}) == []
+
+
+def test_count_reflects_upserts_and_deletes(store):
+    assert store.count("ns") == 0
+    store.upsert("ns", StoredEntry(key="a", embedding=[1.0, 0.0], value="A"))
+    store.upsert("ns", StoredEntry(key="b", embedding=[0.0, 1.0], value="B"))
+    assert store.count("ns") == 2
+    store.delete("ns", "a")
+    assert store.count("ns") == 1
