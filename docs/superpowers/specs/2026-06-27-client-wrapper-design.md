@@ -78,7 +78,8 @@ class SemCache:
         top_k: int | None = None,
         fail_open: bool = True,           # False → raise SemCacheError instead of falling through
         timeout: float = 120.0,
-        transport=None,                   # test seam: httpx transport injection (e.g. ASGITransport)
+        http_client: "httpx.Client | None" = None,    # test seam: inject sync client
+        http_aclient: "httpx.AsyncClient | None" = None,  # test seam: inject async client
     ): ...
 
     # --- namespace setup (explicit; optional — auto-create handles the common case) ---
@@ -117,7 +118,8 @@ Semantics:
   dimension `D` and issues `POST /namespaces` with that `D` (plus
   `filter_keys=["model"]` when `model` is set, and any provided default
   threshold/top_k). 201 = created, 409 = already exists — both fine. A one-time
-  per-instance guard prevents re-posting on every call. This is compatible with
+  guard on the shared session (see `with_model`) prevents re-posting on every
+  call, including across model-scoped views. This is compatible with
   the core rule that the *service* never infers dimension from a write: the
   *client* declares a concrete measured `D`; the service still requires an
   explicit `POST /namespaces`. `ensure_namespace(dimension)` remains public for
@@ -167,8 +169,12 @@ Mapping decisions:
 - **Fail-open carries through:** a SemCache outage makes `lookup` return `None`
   (a LangChain cache miss), so LangChain just calls the model.
 
-`with_model(llm_string)` is a small client method returning a model-scoped view
-that shares the underlying HTTP client (cheap copy, no new connection).
+`with_model(llm_string)` returns a model-scoped view via a shallow copy that
+overrides only the model. The copy shares one internal session object holding
+the httpx clients and the auto-create guard, so model-scoped views reuse
+connections and never re-POST the namespace. The LangChain adapter creates a
+view on every `lookup`/`update`; sharing the session keeps that to one
+namespace POST for the whole process.
 
 ## Testing
 
@@ -176,8 +182,17 @@ All deterministic: no real LLM, no real embedding model, known vectors only.
 
 ### `tests/test_client.py` — generic client against the real core, in-process
 
-Point `httpx` at the FastAPI `app` via `ASGITransport` — no socket, in-memory
-backend. Exercises client + routes + service + in-memory store end-to-end.
+Drive the FastAPI `app` in-process — no socket, in-memory backend. Exercises
+client + routes + service + in-memory store end-to-end. The sync path injects a
+`fastapi.testclient.TestClient` (a sync `httpx.Client` over the ASGI app); the
+async path injects `AsyncClient(transport=ASGITransport(app=app))` (sync
+`httpx.Client` cannot drive `ASGITransport`).
+
+```python
+from fastapi.testclient import TestClient
+client = SemCache(base_url="http://test", namespace="t", embed=embed,
+                  http_client=TestClient(app, base_url="http://test"))
+```
 
 Cases:
 
@@ -215,8 +230,10 @@ path end-to-end: a LangChain RAG chain → `LangChainSemCache` → real `SemCach
 client → real FastAPI app → real Redis vector search. Stubbed only where project
 convention already stubs: a deterministic `embed` (France prompts map to vectors
 with cosine ≥ threshold) and a counting fake LLM. The app is reached via
-`httpx.ASGITransport(app=app)` with `SEMCACHE_BACKEND=redis`, so the real service
-code and `RedisVectorStore` run without a socket.
+a `fastapi.testclient.TestClient(app)` injected as the sync `http_client`, with
+`SEMCACHE_BACKEND=redis` so the real service code and `RedisVectorStore` run
+without a socket. (LangChain's `set_llm_cache` drives the adapter's sync path,
+so the sync client is the one that matters here.)
 
 Pipeline (real LangChain Runnables, minimal but genuine RAG shape):
 
@@ -226,7 +243,8 @@ prompt    = PromptTemplate.from_template(
     "Context: {context}\n\nQuestion: {question}\nAnswer:")
 llm       = CountingFakeLLM(responses=["Paris"])           # records call_count
 set_llm_cache(LangChainSemCache(SemCache(base_url="http://test", namespace="rag",
-                                         embed=stub_embed, transport=asgi)))
+                                         embed=stub_embed,
+                                         http_client=TestClient(app, base_url="http://test"))))
 chain = {"context": retriever, "question": RunnablePassthrough()} | prompt | llm
 ```
 
