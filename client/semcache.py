@@ -207,3 +207,85 @@ class SemCache:
             return result
 
         return wrapped
+
+    # --- async creation --------------------------------------------------
+
+    async def aensure_namespace(
+        self,
+        dimension: int,
+        *,
+        default_threshold: float | None = None,
+        default_top_k: int | None = None,
+    ) -> None:
+        await self._acreate(dimension, default_threshold, default_top_k)
+
+    async def _acreate(
+        self, dimension: int, default_threshold: float | None, default_top_k: int | None
+    ) -> None:
+        body = self._create_body(dimension, default_threshold, default_top_k)
+        try:
+            resp = await self._session.aclient().post("/namespaces", json=body)
+            if resp.status_code not in (201, 409):
+                raise SemCacheError(f"create namespace {resp.status_code}: {resp.text}")
+        except (httpx.HTTPError, SemCacheError) as exc:
+            self._fail("ensure_namespace", exc)
+            return
+        self._session.ensured = True
+
+    async def _aensure(self, dimension: int) -> None:
+        if self._session.ensured:
+            return
+        await self._acreate(dimension, None, None)
+
+    async def _aembed_call(self, text: str) -> list[float]:
+        if self._aembed is None:
+            raise SemCacheError("async path requires aembed= in the SemCache constructor")
+        return list(await self._aembed(text))
+
+    # --- async primitives ------------------------------------------------
+
+    async def _aquery(self, vector: Sequence[float]) -> str | None:
+        vector = list(vector)
+        await self._aensure(len(vector))
+        try:
+            resp = await self._session.aclient().post(
+                f"/{self.namespace}/query", json=self._query_body(vector)
+            )
+            if resp.status_code != 200:
+                raise SemCacheError(f"query {resp.status_code}: {resp.text}")
+            matches = resp.json().get("matches", [])
+        except (httpx.HTTPError, SemCacheError) as exc:
+            return self._fail("lookup", exc)
+        return matches[0]["value"] if matches else None
+
+    async def _aput(self, key: str, vector: Sequence[float], value: Any) -> None:
+        vector = list(vector)
+        await self._aensure(len(vector))
+        body = {"key": key, "embedding": vector, "value": value, "metadata": self._metadata()}
+        try:
+            resp = await self._session.aclient().post(f"/{self.namespace}/entries", json=body)
+            if resp.status_code != 201:
+                raise SemCacheError(f"store {resp.status_code}: {resp.text}")
+        except (httpx.HTTPError, SemCacheError) as exc:
+            self._fail("store", exc)
+
+    async def alookup(self, text: str) -> str | None:
+        return await self._aquery(await self._aembed_call(text))
+
+    async def astore(self, text: str, value: Any, *, key: str | None = None) -> None:
+        await self._aput(key or self._key(text), await self._aembed_call(text), value)
+
+    def acached(
+        self, llm: Callable[[str], Awaitable[str]]
+    ) -> Callable[[str], Awaitable[str]]:
+        @functools.wraps(llm)
+        async def wrapped(text: str) -> str:
+            vector = await self._aembed_call(text)
+            hit = await self._aquery(vector)
+            if hit is not None:
+                return hit
+            result = await llm(text)
+            await self._aput(self._key(text), vector, result)
+            return result
+
+        return wrapped

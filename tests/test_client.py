@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -140,3 +142,55 @@ def test_with_model_shares_ensure_guard(app_client):
     view = cache.with_model("m2")
     cache.store("capital of France?", "Paris")
     assert view._session is cache._session                     # shared session object
+
+
+def _async_app_client():
+    from app.dependencies import get_service
+
+    get_service.cache_clear()
+    from app.main import app
+
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+
+
+async def aembed(text):
+    return VECS[text]
+
+
+def test_acached_hit_does_not_call_llm():
+    async def scenario():
+        from client import SemCache
+
+        calls = {"n": 0}
+
+        async def llm(text):
+            calls["n"] += 1
+            return "Paris"
+
+        async with _async_app_client() as ac:
+            cache = SemCache(
+                "http://test", "at", embed, aembed=aembed, http_aclient=ac
+            )
+            wrapped = cache.acached(llm)
+            assert await wrapped("capital of France?") == "Paris"
+            assert await wrapped("France's capital, remind me?") == "Paris"
+            assert calls["n"] == 1
+
+    asyncio.run(scenario())
+
+
+def test_alookup_after_astore():
+    async def scenario():
+        from client import SemCache
+
+        async with _async_app_client() as ac:
+            cache = SemCache(
+                "http://test", "at2", embed, aembed=aembed, http_aclient=ac
+            )
+            assert await cache.alookup("capital of France?") is None
+            await cache.astore("capital of France?", "Paris")
+            assert await cache.alookup("France's capital, remind me?") == "Paris"
+
+    asyncio.run(scenario())
