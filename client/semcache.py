@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import functools
 import hashlib
 import logging
@@ -184,3 +185,25 @@ class SemCache:
 
     def store(self, text: str, value: Any, *, key: str | None = None) -> None:
         self._put(key or self._key(text), self._embed(text), value)
+
+    # --- model-scoped view ----------------------------------------------
+
+    def with_model(self, model: str) -> "SemCache":
+        view = copy.copy(self)            # shares self._session (clients + ensure guard)
+        view._model = model
+        return view
+
+    # --- convenience wrapper --------------------------------------------
+
+    def cached(self, llm: Callable[[str], str]) -> Callable[[str], str]:
+        @functools.wraps(llm)
+        def wrapped(text: str) -> str:
+            vector = list(self._embed(text))    # embed once, reuse for query + store
+            hit = self._query(vector)
+            if hit is not None:
+                return hit
+            result = llm(text)
+            self._put(self._key(text), vector, result)
+            return result
+
+        return wrapped

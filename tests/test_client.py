@@ -98,3 +98,45 @@ def test_fail_closed_raises_on_server_error():
     cache = SemCache("http://test", "t", embed, fail_open=False, http_client=dead)
     with pytest.raises(SemCacheError):
         cache.lookup("capital of France?")
+
+
+def test_cached_hit_does_not_call_llm(app_client):
+    cache = make(app_client)
+    calls = {"n": 0}
+
+    def llm(text):
+        calls["n"] += 1
+        return "Paris"
+
+    wrapped = cache.cached(llm)
+    assert wrapped("capital of France?") == "Paris"            # miss → calls llm
+    assert wrapped("France's capital, remind me?") == "Paris"  # hit → no llm
+    assert calls["n"] == 1
+
+
+def test_cached_miss_calls_llm_once_and_stores(app_client):
+    cache = make(app_client)
+    calls = {"n": 0}
+
+    def llm(text):
+        calls["n"] += 1
+        return "Paris"
+
+    cache.cached(llm)("capital of France?")
+    assert calls["n"] == 1
+    assert cache.lookup("capital of France?") == "Paris"       # was stored
+
+
+def test_model_isolation(app_client):
+    a = make(app_client, namespace="m", model="model-a")
+    b = make(app_client, namespace="m", model="model-b")
+    a.store("capital of France?", "Paris-A")
+    assert a.lookup("France's capital, remind me?") == "Paris-A"
+    assert b.lookup("France's capital, remind me?") is None    # different model → isolated
+
+
+def test_with_model_shares_ensure_guard(app_client):
+    cache = make(app_client, namespace="share", model="m1")
+    view = cache.with_model("m2")
+    cache.store("capital of France?", "Paris")
+    assert view._session is cache._session                     # shared session object
