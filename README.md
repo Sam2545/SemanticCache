@@ -31,6 +31,24 @@ git clone https://github.com/Sam2545/SemanticCache.git && cd SemanticCache
 ./start.sh        # builds, waits until healthy, prints the URL  (or: make up)
 ```
 
+### Run it without Docker (Python)
+
+No Docker — a one-command script that creates its own virtual environment:
+
+```bash
+./start-local.sh        # makes .venv, installs SemCache, serves on :8000
+```
+
+Or manage your own venv (works without cloning):
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install git+https://github.com/Sam2545/SemanticCache.git
+semcache
+```
+
+Single-process and in-memory (no Redis persistence/TTL) — the zero-infra way to try it.
+
 Interactive API docs at <http://localhost:8000/docs>.
 
 ### Development
