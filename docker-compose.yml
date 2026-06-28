@@ -11,6 +11,12 @@ services:
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
 
   redis:
     image: redis/redis-stack-server:latest
