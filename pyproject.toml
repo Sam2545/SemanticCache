@@ -29,6 +29,9 @@ dev = [
     "langchain-core>=0.2",
 ]
 
+[project.scripts]
+semcache = "app.cli:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
