@@ -190,17 +190,57 @@ Per-request overrides are supported: `"top_k": 3` to return more matches, or
 ### In Python (the client SDK)
 
 The bundled `client` package wraps the embed → search → hit/miss → store loop so
-you never write it by hand. Install it with `pip install -e ".[client]"`, supply
-your own embedding function, and wrap any LLM call:
+you never write it by hand. Install it with `pip install -e ".[client]"`.
+
+#### Provide an embedding function
+
+SemCache never computes embeddings — you give the client an `embed` callable that
+turns a string into a vector (`Callable[[str], list[float]]`). It's the only place
+a model is involved, which is what keeps the cache generic. The vector length must
+match the namespace `dimension`, and you must use the **same** model for writes and
+queries. Pick whatever embedder you like:
+
+```python
+# OpenAI
+from openai import OpenAI
+oai = OpenAI()
+def embed(text: str) -> list[float]:
+    return oai.embeddings.create(model="text-embedding-3-small", input=text).data[0].embedding
+
+# Local, no API (sentence-transformers)
+from sentence_transformers import SentenceTransformer
+model = SentenceTransformer("all-MiniLM-L6-v2")
+def embed(text: str) -> list[float]:
+    return model.encode(text).tolist()
+
+# Ollama (local)
+import ollama
+def embed(text: str) -> list[float]:
+    return ollama.embeddings(model="nomic-embed-text", prompt=text)["embedding"]
+```
+
+#### Add a vector embedding, then search
+
+`store()` embeds the text and saves an entry; `lookup()` embeds a query and returns
+the closest stored value (or `None` on a miss). The namespace is auto-created on the
+first call, sized to your embedder's output:
 
 ```python
 from client import SemCache
 
-def embed(text: str) -> list[float]:
-    ...  # call your embedding model, return the vector
-
 cache = SemCache("http://localhost:8000", namespace="faqs", embed=embed)
 
+# add a vector embedding (embed runs under the hood; key defaults to a hash of the text)
+cache.store("What is the capital of France?", "The capital of France is Paris.")
+
+# search by similarity
+cache.lookup("Remind me, France's capital?")   # -> "The capital of France is Paris."  (hit)
+cache.lookup("How do I sort a list in Python?") # -> None                                (miss)
+```
+
+#### Or wrap an LLM call so it caches itself
+
+```python
 @cache.cached
 def answer(question: str) -> str:
     return call_my_llm(question)          # only runs on a cache miss
