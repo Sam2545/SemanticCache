@@ -9,7 +9,16 @@ compute their own embeddings and send the vectors in.
 
 ## Quick start
 
-### Run it without cloning
+There are **three ways to run SemCache** — all serve the same API on
+<http://localhost:8000> (interactive docs at `/docs`). Pick one:
+
+| # | Option | Needs | Best for |
+|---|--------|-------|----------|
+| 1 | Published image (no clone) | Docker | Fastest try — one `docker run`, no source |
+| 2 | Docker from a clone | Docker + git | Full Redis-backed stack; local development |
+| 3 | Docker-free (Python) | Python 3.12 | No Docker at all; isolated virtual environment |
+
+### Option 1 — Published image (no clone)
 
 Quick try (in-memory backend, zero infrastructure):
 
@@ -17,29 +26,32 @@ Quick try (in-memory backend, zero infrastructure):
 docker run -p 8000:8000 ghcr.io/sam2545/semcache
 ```
 
-Full stack (API + Redis), using the published image:
+Full stack with Redis, still no clone (downloads only the compose file):
 
 ```bash
 curl -O https://raw.githubusercontent.com/Sam2545/SemanticCache/main/docker-compose.prod.yml
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Run it from a clone
+### Option 2 — Docker from a clone
+
+Builds from source and runs the full API + Redis stack:
 
 ```bash
 git clone https://github.com/Sam2545/SemanticCache.git && cd SemanticCache
 ./start.sh        # builds, waits until healthy, prints the URL  (or: make up)
 ```
 
-### Run it without Docker (Python)
+### Option 3 — Docker-free (Python)
 
 No Docker — a one-command script that creates its own virtual environment:
 
 ```bash
-./start-local.sh        # makes .venv, installs SemCache, serves on :8000
+git clone https://github.com/Sam2545/SemanticCache.git && cd SemanticCache
+./start-local.sh  # makes .venv, installs SemCache, serves on :8000  (or: make serve)
 ```
 
-Or manage your own venv (works without cloning):
+Or manage your own venv, without cloning:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -47,9 +59,11 @@ pip install git+https://github.com/Sam2545/SemanticCache.git
 semcache
 ```
 
-Single-process and in-memory (no Redis persistence/TTL) — the zero-infra way to try it.
+Options 1 (`docker run`) and 3 use the in-memory backend (single-process, no Redis
+persistence or TTL) — the zero-infra way to try it. Options 1 (compose) and 2 run
+the Redis-backed stack.
 
-Interactive API docs at <http://localhost:8000/docs>.
+Once it's running, open the interactive API docs at <http://localhost:8000/docs>.
 
 ### Development
 
