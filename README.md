@@ -9,13 +9,37 @@ compute their own embeddings and send the vectors in.
 
 ## Quick start
 
+### Run it without cloning
+
+Quick try (in-memory backend, zero infrastructure):
+
 ```bash
-docker compose up --build   # FastAPI on :8000 (Redis backend), Redis on :6379
-pytest -m "not integration" # fast unit suite (no Redis required)
-docker compose run --rm api pytest -m integration   # Redis contract tests
+docker run -p 8000:8000 ghcr.io/sam2545/semcache
+```
+
+Full stack (API + Redis), using the published image:
+
+```bash
+curl -O https://raw.githubusercontent.com/Sam2545/SemanticCache/main/docker-compose.prod.yml
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Run it from a clone
+
+```bash
+git clone https://github.com/Sam2545/SemanticCache.git && cd SemanticCache
+./start.sh        # builds, waits until healthy, prints the URL  (or: make up)
 ```
 
 Interactive API docs at <http://localhost:8000/docs>.
+
+### Development
+
+```bash
+pytest -m "not integration"                          # fast unit suite (no Redis)
+docker compose run --rm api pytest -m integration    # Redis contract tests
+make down                                            # stop the stack
+```
 
 ## Concepts
 
